@@ -1,3 +1,5 @@
+import com.oracle.javafx.jmx.json.JSONReader;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -20,15 +22,26 @@ public class APIAccess {
   public static final String XBOX_BASE_URL = "http://api.xbox.smitegame.com/smiteapi.svc/";
   public static final String PS4_BASE_URL = "http://api.ps4.smitegame.com/smiteapi.svc/";
 
+  public static final int LANGUAGE_CODE_ENGLISH = 1;
+
   private static String sessionID = "";
   private static String signature = "";
 
+  private static String xboxSessionID = "";
+  private static String xboxSignature = "";
+
+  private static String PS4SessionID = "";
+  private static String PS4Signature = "";
+
   public static void main(String[] params) {
-    signature = getSignature();
+    signature = getSignature("createsession");
     createSession(signature);
-    System.out.println("Signature: " + signature);
-    System.out.println("sessionID: " + sessionID);
-    getPlayer("HirezPlayer");
+
+    xboxSignature = getSignature("createsession");
+    createXboxSession(xboxSignature);
+    // getGods();
+    getPlayer("Weak3n");
+    getXboxPlayer("Aerovertics");
   }
 
   /**
@@ -69,9 +82,28 @@ public class APIAccess {
    *
    */
   public static void createSession(String signature) {
-    String sessionLink = BASE_URL + "createsessionJson/" + DEV_ID + "/" + signature +
+    createSession(signature, BASE_URL);
+  }
+
+  public static void createXboxSession(String signature) {
+    createSession(signature, XBOX_BASE_URL);
+  }
+
+  public static void createPS4Session(String signature) {
+    createSession(signature, PS4_BASE_URL);
+  }
+
+  private static void createSession(String signature, String platform) {
+    String sessionLink = platform + "createsessionJson/" + DEV_ID + "/" + signature +
         "/" + getUtcTimeStamp();
-    sessionID = getSessionID(makeGetRequest(sessionLink));
+    System.out.println("Session url request: " + sessionLink);
+    if (platform.equals(BASE_URL)) {
+      sessionID = getSessionID(makeGetRequest(sessionLink));
+    } else if (platform.equals(XBOX_BASE_URL)) {
+      xboxSessionID = getSessionID(makeGetRequest(sessionLink));
+    } else {
+      PS4SessionID = getSessionID(makeGetRequest(sessionLink));
+    }
   }
 
   private static String getSessionID(String result) {
@@ -79,12 +111,44 @@ public class APIAccess {
     return parts[1].split(":")[1].replace("\"", "");
   }
 
+  /**
+   * [ResponseFormat]/{developerId}/{signature}/{session}/{timestamp}/{languageCode}
+   */
+  public static void getGods() {
+    signature = getSignature("getgods");
+    String link = BASE_URL + "getgodsjson/" + DEV_ID + "/" + signature +
+        "/" + sessionID + "/" + getUtcTimeStamp() + "/" + LANGUAGE_CODE_ENGLISH;
+    System.out.println("Get gods link: " + link);
+    makeGetRequest(link);
+  }
+
   // getplayer[ResponseFormat]/{devId}/{signature}/{sessionId}/{timestamp}/{playerName}
   public static void getPlayer(String name) {
-    String link = BASE_URL + "getplayerjson/" + DEV_ID + "/" + signature +
-        "/" + sessionID + "/" + getUtcTimeStamp() + "/" + name;
-    System.out.println(link);
-    makeGetRequest(link, "Grabbing Xbox player: " + name);
+    getPlayer(name, BASE_URL);
+  }
+
+  public static void getXboxPlayer(String name) {
+    getPlayer(name, XBOX_BASE_URL);
+  }
+
+  public static void getPS4Player(String name) {
+    getPlayer(name, PS4_BASE_URL);
+  }
+
+  private static void getPlayer(String name, String platform) {
+    String id = "";
+    if (platform.equals(BASE_URL)) {
+      id = sessionID;
+    } else if (platform.equals(XBOX_BASE_URL)) {
+      id = xboxSessionID;
+    } else {
+      id = PS4SessionID;
+    }
+    signature = getSignature("getplayer");
+    String link = platform + "getplayerjson/" + DEV_ID + "/" + signature +
+        "/" + id + "/" + getUtcTimeStamp() + "/" + name;
+    System.out.println("Get player link: " + link);
+    makeGetRequest(link, "Grabbing player: " + name);
   }
 
   private static String getUtcTimeStamp() {
@@ -93,8 +157,8 @@ public class APIAccess {
     return dateFormat.format(new Date());
   }
 
-  private static String getSignature() {
-    return getMD5Hash(DEV_ID + "createsession" + AUTH_KEY + getUtcTimeStamp());
+  private static String getSignature(String method) {
+    return getMD5Hash(DEV_ID + method + AUTH_KEY + getUtcTimeStamp());
   }
 
   public static String makeGetRequest(String link) {
@@ -109,11 +173,15 @@ public class APIAccess {
         throw new RuntimeException("Failed : HTTP error code : " + connection.getResponseCode());
       }
       BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+      StringBuilder response = new StringBuilder();
       String output;
       String result = "";
-      System.out.println(customMessage);
+      if (customMessage != null && customMessage.length() > 0) {
+        System.out.println(customMessage);
+      }
       System.out.println("Output from Server .... \n");
       while ((output = br.readLine()) != null) {
+        response.append(output);
         result += output;
         System.out.println(output);
       }
